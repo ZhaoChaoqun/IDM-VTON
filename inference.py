@@ -233,32 +233,32 @@ def main():
     vae = AutoencoderKL.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="vae",
-        torch_dtype=torch.float16,
+        torch_dtype=weight_dtype,
     )
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="unet",
-        torch_dtype=torch.float16,
+        torch_dtype=weight_dtype,
     )
     image_encoder = CLIPVisionModelWithProjection.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="image_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=weight_dtype,
     )
     UNet_Encoder = UNet2DConditionModel_ref.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="unet_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=weight_dtype,
     )
     text_encoder_one = CLIPTextModel.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="text_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=weight_dtype,
     )
     text_encoder_two = CLIPTextModelWithProjection.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="text_encoder_2",
-        torch_dtype=torch.float16,
+        torch_dtype=weight_dtype,
     )
     tokenizer_one = AutoTokenizer.from_pretrained(
         args.pretrained_model_name_or_path,
@@ -324,13 +324,14 @@ def main():
             tokenizer_2 = tokenizer_two,
             scheduler = noise_scheduler,
             image_encoder=image_encoder,
-            torch_dtype=torch.float16,
-    ).to(accelerator.device)
+            torch_dtype=weight_dtype,
+    )
+    # pipe.to(accelerator.device)
     pipe.unet_encoder = UNet_Encoder
 
-    # pipe.enable_sequential_cpu_offload()
+    pipe.enable_sequential_cpu_offload()
     # pipe.enable_model_cpu_offload()
-    # pipe.enable_vae_slicing()
+    pipe.enable_vae_slicing()
 
 
 
@@ -393,7 +394,12 @@ def main():
                         
 
 
-                        generator = torch.Generator(pipe.device).manual_seed(args.seed) if args.seed is not None else None
+                        # generator = torch.Generator(pipe.device).manual_seed(args.seed) if args.seed is not None else None
+                        generator = torch.Generator(device=torch.device('cuda:0'))
+
+                        if args.seed is not None:
+                            generator.manual_seed(args.seed)
+                            
                         images = pipe(
                             prompt_embeds=prompt_embeds,
                             negative_prompt_embeds=negative_prompt_embeds,
